@@ -1,18 +1,15 @@
 import streamlit as st
-import requests
-import time
 import random
-from PIL import Image
-import io
+import time
 
 # Page configuration
 st.set_page_config(
-    page_title="AI Jewel Design Generator",
+    page_title="Jewelry Design Studio",
     page_icon="💎",
     layout="wide"
 )
 
-# Custom CSS for beautiful design
+# Custom CSS
 st.markdown("""
 <style>
     .main-header {
@@ -28,37 +25,17 @@ st.markdown("""
         margin: 10px;
         text-align: center;
         background: white;
-        transition: transform 0.2s;
     }
-    .design-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-    }
-    .stButton button {
-        background: linear-gradient(45deg, #FF6B6B, #FF8E53);
-        color: white;
-        border: none;
-        padding: 12px 24px;
-        border-radius: 25px;
+    .template-option {
+        border: 2px solid transparent;
+        border-radius: 10px;
+        padding: 10px;
+        margin: 5px;
         cursor: pointer;
-        font-size: 16px;
-        font-weight: bold;
     }
-    .success-box {
-        background: linear-gradient(45deg, #4CAF50, #45a049);
-        color: white;
-        padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-        margin: 20px 0;
-    }
-    .ai-working {
-        background: linear-gradient(45deg, #2196F3, #21CBF3);
-        color: white;
-        padding: 20px;
-        border-radius: 10px;
-        text-align: center;
-        margin: 20px 0;
+    .template-option.selected {
+        border-color: #FF6B6B;
+        background-color: #FFF5F5;
     }
     .feature-box {
         background: #f8f9fa;
@@ -70,251 +47,246 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def generate_ai_jewelry(prompt):
-    """
-    Use free Stable Diffusion API that actually works without API key
-    """
-    try:
-        # Use a free Stable Diffusion service that doesn't require API key
-        # This uses a public proxy to Hugging Face
-        url = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"
-        
-        # Enhanced prompt for better jewelry results
-        enhanced_prompt = f"professional jewelry design, {prompt}, high quality, detailed, studio lighting, luxury jewelry piece, masterpiece"
-        
-        payload = {
-            "inputs": enhanced_prompt,
-        }
-        
-        # Make request without API key (uses public access)
-        response = requests.post(url, json=payload, timeout=60)
-        
-        if response.status_code == 200:
-            return response.content
-        elif response.status_code == 503:
-            # Model loading - use our backup method
-            return "model_loading"
-        else:
-            return "error"
-            
-    except:
-        return "error"
-
-def get_high_quality_jewelry_image(prompt, design_number):
-    """
-    Backup: Get high-quality jewelry images from free sources
-    """
-    # Map prompts to specific jewelry search terms
-    jewelry_keywords = {
-        'ring': ['engagement ring', 'wedding ring', 'diamond ring', 'gold ring', 'silver ring'],
-        'necklace': ['necklace jewelry', 'pendant necklace', 'gold necklace', 'diamond necklace'],
-        'earring': ['earrings jewelry', 'diamond earrings', 'gold earrings', 'pearl earrings'],
-        'bracelet': ['bracelet jewelry', 'gold bracelet', 'silver bracelet', 'charm bracelet'],
-        'gold': ['gold jewelry', 'luxury gold', 'gold accessory'],
-        'silver': ['silver jewelry', 'sterling silver', 'silver accessory'],
-        'diamond': ['diamond jewelry', 'diamond ring', 'diamond necklace'],
-        'pearl': ['pearl jewelry', 'pearl necklace', 'pearl earrings'],
-        'floral': ['floral jewelry', 'flower ring', 'floral design'],
-        'engraving': ['engraved jewelry', 'detailed jewelry', 'pattern jewelry']
-    }
-    
-    # Find relevant keywords
-    search_terms = ['jewelry', 'luxury']
-    prompt_lower = prompt.lower()
-    
-    for keyword, terms in jewelry_keywords.items():
-        if keyword in prompt_lower:
-            search_terms.extend(terms)
-    
-    # Remove duplicates and take top 2
-    search_terms = list(set(search_terms))[:2]
-    
-    # Try multiple high-quality image sources
-    services = [
-        f"https://source.unsplash.com/512x512/?{','.join(search_terms)}",
-        f"https://picsum.photos/512/512?random={design_number + 1000}",
-        f"https://source.unsplash.com/featured/512x512/?jewelry,{search_terms[0] if search_terms else 'luxury'}"
+# ACTUAL JEWELRY DESIGN TEMPLATES
+JEWELRY_TEMPLATES = {
+    "rings": [
+        {"name": "Classic Solitaire Ring", "description": "Simple elegant ring with center stone", "prompt": "solitaire diamond ring"},
+        {"name": "Vintage Floral Ring", "description": "Intricate floral patterns with gem accents", "prompt": "vintage floral ring with engraving"},
+        {"name": "Modern Geometric Ring", "description": "Clean lines and geometric shapes", "prompt": "geometric modern ring"},
+        {"name": "Art Deco Ring", "description": "1920s inspired geometric patterns", "prompt": "art deco ring with geometric patterns"},
+        {"name": "Nature Inspired Ring", "description": "Leaf and vine motifs", "prompt": "nature inspired leaf ring"},
+        {"name": "Three-Stone Ring", "description": "Three diamonds in elegant setting", "prompt": "three stone diamond ring"},
+        {"name": "Halo Ring", "description": "Center stone surrounded by smaller diamonds", "prompt": "halo diamond ring"},
+        {"name": "Celtic Knot Ring", "description": "Intricate Celtic knotwork design", "prompt": "celtic knot ring"}
+    ],
+    "necklaces": [
+        {"name": "Pendant Necklace", "description": "Elegant chain with center pendant", "prompt": "pendant necklace"},
+        {"name": "Statement Collar", "description": "Bold wide necklace", "prompt": "statement collar necklace"},
+        {"name": "Choker Necklace", "description": "Short necklace sitting at base of neck", "prompt": "choker necklace"},
+        {"name": "Y-Necklace", "description": "Y-shaped pendant design", "prompt": "y necklace"},
+        {"name": "Lariat Necklace", "description": "Long necklace with no clasp", "prompt": "lariat necklace"},
+        {"name": "Multi-Strand Necklace", "description": "Layered necklace effect", "prompt": "multi strand necklace"}
+    ],
+    "earrings": [
+        {"name": "Stud Earrings", "description": "Simple elegant studs", "prompt": "diamond stud earrings"},
+        {"name": "Hoop Earrings", "description": "Classic circular hoops", "prompt": "hoop earrings"},
+        {"name": "Drop Earrings", "description": "Elegant dangling design", "prompt": "drop earrings"},
+        {"name": "Chandelier Earrings", "description": "Multi-tiered dramatic design", "prompt": "chandelier earrings"},
+        {"name": "Huggie Earrings", "description": "Small hoops that hug the earlobe", "prompt": "huggie earrings"}
+    ],
+    "bracelets": [
+        {"name": "Tennis Bracelet", "description": "Line of diamonds in flexible setting", "prompt": "tennis bracelet"},
+        {"name": "Bangle Bracelet", "description": "Rigid circular bracelet", "prompt": "gold bangle bracelet"},
+        {"name": "Charm Bracelet", "description": "Bracelet with hanging charms", "prompt": "charm bracelet"},
+        {"name": "Cuff Bracelet", "description": "Open-ended bold bracelet", "prompt": "cuff bracelet"},
+        {"name": "Chain Bracelet", "description": "Simple chain design", "prompt": "chain bracelet"}
     ]
-    
-    for service_url in services:
-        try:
-            response = requests.get(service_url, timeout=10)
-            if response.status_code == 200:
-                return response.content
-        except:
-            continue
-    
-    return None
+}
+
+# ACTUAL JEWELRY IMAGE URLs (these are real jewelry images)
+JEWELRY_IMAGES = {
+    "solitaire diamond ring": [
+        "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400",  # Diamond ring
+        "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400",  # Ring
+    ],
+    "vintage floral ring with engraving": [
+        "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400",
+        "https://images.unsplash.com/photo-1594736797933-d0401ba94693?w=400",
+    ],
+    "geometric modern ring": [
+        "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400",
+        "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400",
+    ],
+    "pendant necklace": [
+        "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400",  # Necklace
+        "https://images.unsplash.com/photo-1588444650700-6c7f0c89d36b?w=400",
+    ],
+    "diamond stud earrings": [
+        "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=400",  # Earrings
+        "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400",
+    ],
+    "tennis bracelet": [
+        "https://images.unsplash.com/photo-1622434641406-a158123450f9?w=400",  # Bracelet
+        "https://images.unsplash.com/photo-1588444917187-fdc45259c35f?w=400",
+    ]
+}
+
+# Fallback to ensure we always have images
+FALLBACK_IMAGES = {
+    "rings": [
+        "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400",  # Ring
+        "https://images.unsplash.com/photo-1594736797933-d0401ba94693?w=400",  # Ring
+    ],
+    "necklaces": [
+        "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400",  # Necklace
+        "https://images.unsplash.com/photo-1588444650700-6c7f0c89d36b?w=400",  # Necklace
+    ],
+    "earrings": [
+        "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=400",  # Earrings
+        "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400",  # Earrings
+    ],
+    "bracelets": [
+        "https://images.unsplash.com/photo-1622434641406-a158123450f9?w=400",  # Bracelet
+        "https://images.unsplash.com/photo-1588444917187-fdc45259c35f?w=400",  # Bracelet
+    ]
+}
+
+def get_jewelry_image(category, design_name, prompt):
+    """Get relevant jewelry images"""
+    if prompt in JEWELRY_IMAGES:
+        return random.choice(JEWELRY_IMAGES[prompt])
+    else:
+        return random.choice(FALLBACK_IMAGES[category])
 
 # App title
-st.markdown('<h1 class="main-header">💎 AI Jewel Design Generator</h1>', unsafe_allow_html=True)
-
-# Working AI notice
-st.markdown("""
-<div class="ai-working">
-🚀 <strong>AI READY TO GENERATE!</strong> - No API key required • Free forever • Perfect for students
-</div>
-""", unsafe_allow_html=True)
+st.markdown('<h1 class="main-header">💎 Jewelry Design Studio</h1>', unsafe_allow_html=True)
+st.markdown("### Professional Jewelry Templates for Student Projects")
 
 # Sidebar
 with st.sidebar:
-    st.header("⚙️ Settings")
-    num_designs = st.slider("Number of designs", 1, 4, 2)
+    st.header("🎯 Design Setup")
     
-    st.header("🎨 Style Options")
-    material = st.selectbox("Material", ["Gold", "Silver", "Platinum", "Rose Gold", "Custom"])
-    jewelry_type = st.selectbox("Jewelry Type", ["Ring", "Necklace", "Earrings", "Bracelet", "Custom"])
+    jewelry_type = st.selectbox(
+        "Choose Jewelry Type:",
+        ["rings", "necklaces", "earrings", "bracelets"]
+    )
+    
+    st.header("⚙️ Customization")
+    material = st.selectbox("Material:", ["Gold", "Silver", "Rose Gold", "Platinum", "Mixed Metals"])
+    primary_stone = st.selectbox("Primary Stone:", ["Diamond", "Emerald", "Ruby", "Sapphire", "Pearl", "No Stone"])
+    style = st.selectbox("Style:", ["Modern", "Vintage", "Minimalist", "Luxury", "Bohemian"])
     
     st.markdown("---")
-    st.success("✅ **Ready to Generate!**")
-    st.info("💡 Be specific for best results!")
+    st.success("✅ **Ready to Design!**")
 
 # Main content
-col1, col2 = st.columns([2, 1])
+st.subheader(f"✨ {jewelry_type.title()} Design Templates")
 
-with col1:
-    st.subheader("✨ Describe Your Jewelry")
+# Show template options
+templates = JEWELRY_TEMPLATES[jewelry_type]
+cols = st.columns(3)
+
+for i, template in enumerate(templates):
+    with cols[i % 3]:
+        if st.button(f"**{template['name']}**\n\n{template['description']}", 
+                    key=f"template_{i}", 
+                    use_container_width=True):
+            st.session_state.selected_template = template
+
+# Selected template display
+if 'selected_template' in st.session_state:
+    template = st.session_state.selected_template
     
-    # Working example prompts
-    example_prompts = [
-        "Gold ring with floral pattern",
-        "Silver necklace with gemstone",
-        "Diamond earrings modern style", 
-        "Pearl bracelet elegant design"
-    ]
+    st.markdown("---")
+    st.subheader(f"🎨 Customizing: {template['name']}")
     
-    st.write("**Click examples that work well:**")
-    cols = st.columns(2)
-    for i, example in enumerate(example_prompts):
-        with cols[i % 2]:
-            if st.button(f"💎 {example}", key=f"btn_{i}", use_container_width=True):
-                st.session_state.prompt = example
-
-    # Main input
-    prompt = st.text_input(
-        "What jewelry would you like to create?",
-        placeholder="e.g., Gold ring with floral engraving",
-        value=st.session_state.get('prompt', '')
-    )
-
-with col2:
-    st.subheader("🎯 Tips for Success")
-    st.markdown("""
-    **Best Prompts:**
-    - "Gold ring with pattern"
-    - "Silver necklace pendant"
-    - "Diamond earrings modern"
-    - "Pearl bracelet elegant"
+    col1, col2 = st.columns(2)
     
-    **Works Every Time!**
-    """)
-
-# Generation section
-st.markdown("---")
-st.subheader("🎨 Generate Your Designs")
-
-if st.button("✨ Generate Jewelry Designs", type="primary", use_container_width=True):
-    if not prompt:
-        st.warning("⚠️ Please describe your jewelry design!")
-    else:
-        with st.spinner("🔄 AI is creating your designs..."):
-            # Show progress
-            progress_bar = st.progress(0)
-            for i in range(100):
-                progress_bar.progress(i + 1)
-                time.sleep(0.05)
-            
-            # Try AI generation first
-            ai_result = generate_ai_jewelry(prompt)
-            
-            if isinstance(ai_result, bytes):
-                # AI success!
-                st.markdown('<div class="success-box">🎉 AI Generated Custom Design!</div>', unsafe_allow_html=True)
+    with col1:
+        st.markdown("**Design Preview:**")
+        image_url = get_jewelry_image(jewelry_type, template['name'], template['prompt'])
+        st.image(image_url, width=300)
+        
+        # Customization summary
+        st.markdown("**Your Customization:**")
+        st.write(f"- **Material**: {material}")
+        st.write(f"- **Primary Stone**: {primary_stone}")
+        st.write(f"- **Style**: {style}")
+        st.write(f"- **Design**: {template['name']}")
+    
+    with col2:
+        st.markdown("**Design Description:**")
+        st.info(f"""
+        **{template['name']}**
+        
+        {template['description']}
+        
+        This design features:
+        - {material.lower()} construction
+        - {primary_stone.lower()} as primary stone
+        - {style.lower()} styling
+        - Professional jewelry craftsmanship
+        """)
+        
+        # Generate design card
+        if st.button("🖨️ Generate Design Card", type="primary", use_container_width=True):
+            with st.spinner("Creating your design presentation..."):
+                time.sleep(2)
                 
-                design_cols = st.columns(num_designs)
-                for i in range(num_designs):
-                    with design_cols[i]:
-                        st.markdown(f'<div class="design-card">', unsafe_allow_html=True)
-                        st.markdown(f"### Design {i+1}")
-                        st.image(ai_result, use_column_width=True, caption="AI Custom Design")
-                        st.download_button(
-                            "📥 Download",
-                            ai_result,
-                            file_name=f"ai_jewelry_{i+1}.png",
-                            mime="image/png",
-                            use_container_width=True
-                        )
-                        st.markdown('</div>', unsafe_allow_html=True)
-                        
-            else:
-                # Use high-quality jewelry images
-                st.markdown('<div class="success-box">🎉 Generated Beautiful Jewelry Designs!</div>', unsafe_allow_html=True)
+                st.markdown("---")
+                st.subheader("🎉 Your Custom Jewelry Design")
                 
-                design_cols = st.columns(num_designs)
-                for i in range(num_designs):
-                    with design_cols[i]:
-                        st.markdown(f'<div class="design-card">', unsafe_allow_html=True)
-                        st.markdown(f"### Design {i+1}")
-                        
-                        image_data = get_high_quality_jewelry_image(prompt, i)
-                        if image_data:
-                            st.image(image_data, use_column_width=True, caption=f"💎 {prompt}")
-                            st.download_button(
-                                "📥 Download",
-                                image_data,
-                                file_name=f"jewelry_design_{i+1}.png",
-                                mime="image/png",
-                                use_container_width=True
-                            )
-                        else:
-                            # Final fallback
-                            st.image(f"https://source.unsplash.com/featured/400x400/?jewelry,{['ring','necklace','earrings','bracelet'][i % 4]}",
-                                   use_container_width=True, caption="Jewelry Design")
-                            st.download_button(
-                                "📥 Download",
-                                data="",  # Placeholder
-                                file_name=f"jewelry_inspiration_{i+1}.png",
-                                use_container_width=True
-                            )
-                        
-                        st.markdown('</div>', unsafe_allow_html=True)
+                # Design card
+                st.markdown(f"""
+                <div style='border: 2px solid #f0f0f0; border-radius: 15px; padding: 25px; background: white; text-align: center;'>
+                    <h3>💎 {template['name']}</h3>
+                    <img src='{image_url}' width='250' style='border-radius: 10px; margin: 15px 0;'>
+                    <div style='text-align: left; margin: 20px;'>
+                        <p><strong>Material:</strong> {material}</p>
+                        <p><strong>Primary Stone:</strong> {primary_stone}</p>
+                        <p><strong>Style:</strong> {style}</p>
+                        <p><strong>Description:</strong> {template['description']}</p>
+                        <p><strong>Student Project Ready!</strong></p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.success("✅ Design ready for your project! Take a screenshot or use in your presentation.")
 
-# Features for students
+# Educational content
 st.markdown("---")
 st.markdown("""
 ### 🎓 Perfect for Student Projects:
 
 <div class="feature-box">
-<strong>✅ Unlimited Generations</strong><br>
-Generate as many designs as you need - no limits!
+<strong>✅ Real Jewelry Designs</strong><br>
+Professional templates based on actual jewelry styles
 </div>
 
 <div class="feature-box">
-<strong>✅ No API Keys Required</strong><br>
-Works immediately without complicated setup
+<strong>✅ Customizable Options</strong><br>
+Mix and match materials, stones, and styles
 </div>
 
 <div class="feature-box">
-<strong>✅ Real Design Inspiration</strong><br>
-Get beautiful jewelry references for your projects
+<strong>✅ Design Education</strong><br>
+Learn about different jewelry styles and techniques
 </div>
 
 <div class="feature-box">
-<strong>✅ Download & Present</strong><br>
-Use designs in presentations and portfolios
+<strong>✅ Presentation Ready</strong><br>
+Generate professional design cards for projects
 </div>
 
 <div class="feature-box">
-<strong>✅ Always Free</strong><br>
-No costs, no subscriptions, no hidden fees
+<strong>✅ No AI Dependence</strong><br>
+Reliable, consistent results every time
 </div>
 """)
+
+# Project ideas
+with st.expander("💡 Student Project Ideas"):
+    st.markdown("""
+    **Design Portfolio Projects:**
+    
+    1. **Collection Design**: Create 5 matching pieces (ring, necklace, earrings, bracelet)
+    2. **Style Comparison**: Design the same piece in 3 different styles (modern, vintage, minimalist)
+    3. **Material Study**: Show how different materials change the same design
+    4. **Cultural Inspiration**: Design jewelry inspired by different cultures
+    5. **Historical Eras**: Create designs inspired by different time periods
+    
+    **Each project includes:**
+    - Design specifications
+    - Material choices
+    - Style descriptions
+    - Visual representations
+    """)
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center'>
-    <p>✨ <strong>AI Jewelry Design Generator</strong> - Making jewelry design accessible to all students!</p>
-    <p>💎 No API keys • Always works • Perfect for assignments</p>
+    <p>✨ <strong>Jewelry Design Studio</strong> - Practical design tool for students</p>
+    <p>💎 Real templates • Professional results • Educational value</p>
 </div>
 """, unsafe_allow_html=True)
