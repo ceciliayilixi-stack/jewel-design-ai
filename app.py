@@ -1,6 +1,7 @@
 import streamlit as st
-import random
+import json
 import time
+from datetime import datetime
 
 # Page configuration
 st.set_page_config(
@@ -18,275 +19,284 @@ st.markdown("""
         text-align: center;
         margin-bottom: 2rem;
     }
-    .design-card {
+    .design-spec-card {
         border: 2px solid #f0f0f0;
         border-radius: 15px;
-        padding: 20px;
-        margin: 10px;
-        text-align: center;
+        padding: 25px;
+        margin: 15px 0;
         background: white;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-    .template-option {
-        border: 2px solid transparent;
-        border-radius: 10px;
-        padding: 10px;
-        margin: 5px;
-        cursor: pointer;
-    }
-    .template-option.selected {
-        border-color: #FF6B6B;
-        background-color: #FFF5F5;
-    }
-    .feature-box {
+    .spec-item {
         background: #f8f9fa;
-        border-radius: 10px;
-        padding: 15px;
-        margin: 10px 0;
+        padding: 10px 15px;
+        margin: 8px 0;
+        border-radius: 8px;
         border-left: 4px solid #FF6B6B;
     }
+    .material-gold { background: #ffd700; color: black; padding: 5px 10px; border-radius: 5px; }
+    .material-silver { background: #c0c0c0; color: black; padding: 5px 10px; border-radius: 5px; }
+    .material-rosegold { background: #b76e79; color: white; padding: 5px 10px; border-radius: 5px; }
+    .material-platinum { background: #e5e4e2; color: black; padding: 5px 10px; border-radius: 5px; }
+    
+    .stone-diamond { background: linear-gradient(45deg, #e6f7ff, #b3e0ff); padding: 5px 10px; border-radius: 5px; }
+    .stone-emerald { background: linear-gradient(45deg, #90EE90, #32CD32); padding: 5px 10px; border-radius: 5px; }
+    .stone-ruby { background: linear-gradient(45deg, #ffcccc, #ff6666); padding: 5px 10px; border-radius: 5px; }
+    .stone-sapphire { background: linear-gradient(45deg, #ccccff, #6666ff); padding: 5px 10px; border-radius: 5px; }
+    
+    .style-modern { background: linear-gradient(45deg, #667eea, #764ba2); color: white; padding: 5px 10px; border-radius: 5px; }
+    .style-vintage { background: linear-gradient(45deg, #f093fb, #f5576c); color: white; padding: 5px 10px; border-radius: 5px; }
+    .style-minimalist { background: linear-gradient(45deg, #4facfe, #00f2fe); color: white; padding: 5px 10px; border-radius: 5px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ACTUAL JEWELRY DESIGN TEMPLATES
-JEWELRY_TEMPLATES = {
-    "rings": [
-        {"name": "Classic Solitaire Ring", "description": "Simple elegant ring with center stone", "prompt": "solitaire diamond ring"},
-        {"name": "Vintage Floral Ring", "description": "Intricate floral patterns with gem accents", "prompt": "vintage floral ring with engraving"},
-        {"name": "Modern Geometric Ring", "description": "Clean lines and geometric shapes", "prompt": "geometric modern ring"},
-        {"name": "Art Deco Ring", "description": "1920s inspired geometric patterns", "prompt": "art deco ring with geometric patterns"},
-        {"name": "Nature Inspired Ring", "description": "Leaf and vine motifs", "prompt": "nature inspired leaf ring"},
-        {"name": "Three-Stone Ring", "description": "Three diamonds in elegant setting", "prompt": "three stone diamond ring"},
-        {"name": "Halo Ring", "description": "Center stone surrounded by smaller diamonds", "prompt": "halo diamond ring"},
-        {"name": "Celtic Knot Ring", "description": "Intricate Celtic knotwork design", "prompt": "celtic knot ring"}
-    ],
-    "necklaces": [
-        {"name": "Pendant Necklace", "description": "Elegant chain with center pendant", "prompt": "pendant necklace"},
-        {"name": "Statement Collar", "description": "Bold wide necklace", "prompt": "statement collar necklace"},
-        {"name": "Choker Necklace", "description": "Short necklace sitting at base of neck", "prompt": "choker necklace"},
-        {"name": "Y-Necklace", "description": "Y-shaped pendant design", "prompt": "y necklace"},
-        {"name": "Lariat Necklace", "description": "Long necklace with no clasp", "prompt": "lariat necklace"},
-        {"name": "Multi-Strand Necklace", "description": "Layered necklace effect", "prompt": "multi strand necklace"}
-    ],
-    "earrings": [
-        {"name": "Stud Earrings", "description": "Simple elegant studs", "prompt": "diamond stud earrings"},
-        {"name": "Hoop Earrings", "description": "Classic circular hoops", "prompt": "hoop earrings"},
-        {"name": "Drop Earrings", "description": "Elegant dangling design", "prompt": "drop earrings"},
-        {"name": "Chandelier Earrings", "description": "Multi-tiered dramatic design", "prompt": "chandelier earrings"},
-        {"name": "Huggie Earrings", "description": "Small hoops that hug the earlobe", "prompt": "huggie earrings"}
-    ],
-    "bracelets": [
-        {"name": "Tennis Bracelet", "description": "Line of diamonds in flexible setting", "prompt": "tennis bracelet"},
-        {"name": "Bangle Bracelet", "description": "Rigid circular bracelet", "prompt": "gold bangle bracelet"},
-        {"name": "Charm Bracelet", "description": "Bracelet with hanging charms", "prompt": "charm bracelet"},
-        {"name": "Cuff Bracelet", "description": "Open-ended bold bracelet", "prompt": "cuff bracelet"},
-        {"name": "Chain Bracelet", "description": "Simple chain design", "prompt": "chain bracelet"}
-    ]
+# Design Templates Database
+DESIGN_TEMPLATES = {
+    "rings": {
+        "solitaire": {
+            "name": "Classic Solitaire Ring",
+            "description": "Single prominent stone in simple elegant setting",
+            "elements": ["Center stone", "Prong setting", "Simple band", "Four or six prongs"],
+            "best_for": ["Engagement", "Everyday wear", "Minimalist style"]
+        },
+        "vintage_floral": {
+            "name": "Vintage Floral Ring", 
+            "description": "Intricate floral patterns with milgrain details",
+            "elements": ["Floral engraving", "Milgrain edges", "Small accent stones", "Scrolling patterns"],
+            "best_for": ["Vintage lovers", "Detailed craftsmanship", "Romantic style"]
+        },
+        "modern_geometric": {
+            "name": "Modern Geometric Ring",
+            "description": "Clean lines, geometric shapes, and contemporary design",
+            "elements": ["Angular shapes", "Clean lines", "Asymmetric design", "Mixed materials"],
+            "best_for": ["Modern style", "Architectural inspiration", "Bold statements"]
+        },
+        "three_stone": {
+            "name": "Three-Stone Ring",
+            "description": "Three stones representing past, present, and future",
+            "elements": ["Three main stones", "Channel or prong setting", "Graduated stones", "Symbolic meaning"],
+            "best_for": ["Anniversaries", "Meaningful gifts", "Balanced design"]
+        }
+    },
+    "necklaces": {
+        "pendant": {
+            "name": "Classic Pendant Necklace",
+            "description": "Elegant chain with meaningful centerpiece",
+            "elements": ["Chain", "Pendant", "Lobster clasp", "Adjustable length"],
+            "best_for": ["Personalization", "Layering", "Everyday wear"]
+        },
+        "statement": {
+            "name": "Statement Collar Necklace",
+            "description": "Bold design that makes an impact",
+            "elements": ["Wide design", "Multiple elements", "Dramatic presence", "Neck-hugging fit"],
+            "best_for": ["Evening wear", "Special occasions", "Fashion statements"]
+        }
+    }
 }
 
-# ACTUAL JEWELRY IMAGE URLs (these are real jewelry images)
-JEWELRY_IMAGES = {
-    "solitaire diamond ring": [
-        "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400",  # Diamond ring
-        "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?w=400",  # Ring
-    ],
-    "vintage floral ring with engraving": [
-        "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400",
-        "https://images.unsplash.com/photo-1594736797933-d0401ba94693?w=400",
-    ],
-    "geometric modern ring": [
-        "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400",
-        "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400",
-    ],
-    "pendant necklace": [
-        "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400",  # Necklace
-        "https://images.unsplash.com/photo-1588444650700-6c7f0c89d36b?w=400",
-    ],
-    "diamond stud earrings": [
-        "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=400",  # Earrings
-        "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400",
-    ],
-    "tennis bracelet": [
-        "https://images.unsplash.com/photo-1622434641406-a158123450f9?w=400",  # Bracelet
-        "https://images.unsplash.com/photo-1588444917187-fdc45259c35f?w=400",
-    ]
+# Material properties
+MATERIALS = {
+    "Gold": {"color": "yellow", "properties": ["Malleable", "Doesn't tarnish", "Traditional"], "class": "material-gold"},
+    "Silver": {"color": "silver", "properties": ["Bright white", "Affordable", "Versatile"], "class": "material-silver"}, 
+    "Rose Gold": {"color": "pink", "properties": ["Romantic", "Modern", "Durable"], "class": "material-rosegold"},
+    "Platinum": {"color": "white", "properties": ["Heavy", "Hypoallergenic", "Prestigious"], "class": "material-platinum"}
 }
 
-# Fallback to ensure we always have images
-FALLBACK_IMAGES = {
-    "rings": [
-        "https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400",  # Ring
-        "https://images.unsplash.com/photo-1594736797933-d0401ba94693?w=400",  # Ring
-    ],
-    "necklaces": [
-        "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=400",  # Necklace
-        "https://images.unsplash.com/photo-1588444650700-6c7f0c89d36b?w=400",  # Necklace
-    ],
-    "earrings": [
-        "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=400",  # Earrings
-        "https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=400",  # Earrings
-    ],
-    "bracelets": [
-        "https://images.unsplash.com/photo-1622434641406-a158123450f9?w=400",  # Bracelet
-        "https://images.unsplash.com/photo-1588444917187-fdc45259c35f?w=400",  # Bracelet
-    ]
+# Stone properties
+STONES = {
+    "Diamond": {"color": "clear", "properties": ["Hardest stone", "Brilliant sparkle", "Traditional"], "class": "stone-diamond"},
+    "Emerald": {"color": "green", "properties": ["Vivid green", "Inclusions common", "Luxurious"], "class": "stone-emerald"},
+    "Ruby": {"color": "red", "properties": ["Deep red", "Rare", "Passionate"], "class": "stone-ruby"},
+    "Sapphire": {"color": "blue", "properties": ["Royal blue", "Durable", "Elegant"], "class": "stone-sapphire"}
 }
-
-def get_jewelry_image(category, design_name, prompt):
-    """Get relevant jewelry images"""
-    if prompt in JEWELRY_IMAGES:
-        return random.choice(JEWELRY_IMAGES[prompt])
-    else:
-        return random.choice(FALLBACK_IMAGES[category])
 
 # App title
-st.markdown('<h1 class="main-header">💎 Jewelry Design Studio</h1>', unsafe_allow_html=True)
-st.markdown("### Professional Jewelry Templates for Student Projects")
+st.markdown('<h1 class="main-header">💎 Jewelry Design Specification Studio</h1>', unsafe_allow_html=True)
+st.markdown("### Create Detailed Jewelry Design Specifications for Student Projects")
 
-# Sidebar
-with st.sidebar:
-    st.header("🎯 Design Setup")
+st.info("""
+**🎯 This tool creates detailed design specifications** that students can use to:
+- **Sketch their designs** based on exact specifications
+- **Understand material properties** and design elements
+- **Create professional design briefs** for portfolios
+- **Learn real jewelry design principles**
+""")
+
+# Design Creation Interface
+col1, col2 = st.columns([1, 1])
+
+with col1:
+    st.subheader("🎨 Design Configuration")
     
     jewelry_type = st.selectbox(
-        "Choose Jewelry Type:",
+        "Jewelry Type:",
         ["rings", "necklaces", "earrings", "bracelets"]
     )
     
-    st.header("⚙️ Customization")
-    material = st.selectbox("Material:", ["Gold", "Silver", "Rose Gold", "Platinum", "Mixed Metals"])
-    primary_stone = st.selectbox("Primary Stone:", ["Diamond", "Emerald", "Ruby", "Sapphire", "Pearl", "No Stone"])
-    style = st.selectbox("Style:", ["Modern", "Vintage", "Minimalist", "Luxury", "Bohemian"])
+    design_style = st.selectbox(
+        "Design Style:",
+        list(DESIGN_TEMPLATES.get(jewelry_type, {}).keys())
+    )
     
-    st.markdown("---")
-    st.success("✅ **Ready to Design!**")
-
-# Main content
-st.subheader(f"✨ {jewelry_type.title()} Design Templates")
-
-# Show template options
-templates = JEWELRY_TEMPLATES[jewelry_type]
-cols = st.columns(3)
-
-for i, template in enumerate(templates):
-    with cols[i % 3]:
-        if st.button(f"**{template['name']}**\n\n{template['description']}", 
-                    key=f"template_{i}", 
-                    use_container_width=True):
-            st.session_state.selected_template = template
-
-# Selected template display
-if 'selected_template' in st.session_state:
-    template = st.session_state.selected_template
+    material = st.selectbox("Primary Material:", list(MATERIALS.keys()))
+    primary_stone = st.selectbox("Primary Stone:", list(STONES.keys()))
     
-    st.markdown("---")
-    st.subheader(f"🎨 Customizing: {template['name']}")
+    # Additional customizations
+    st.subheader("🔧 Additional Details")
+    engraving = st.text_input("Engraving/Pattern:", placeholder="e.g., Floral vines, Geometric lines")
+    setting_type = st.selectbox("Setting Style:", ["Prong", "Bezel", "Channel", "Pave", "Tension"])
+    target_audience = st.selectbox("Target Audience:", ["Bridal", "Everyday", "Luxury", "Fashion", "Vintage"])
+
+with col2:
+    st.subheader("📐 Technical Specifications")
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("**Design Preview:**")
-        image_url = get_jewelry_image(jewelry_type, template['name'], template['prompt'])
-        st.image(image_url, width=300)
+    if jewelry_type == "rings":
+        ring_size = st.slider("Ring Size (US):", 3, 13, 7)
+        band_width = st.selectbox("Band Width:", ["Thin (2mm)", "Standard (4mm)", "Wide (6mm)", "Extra Wide (8mm+)"])
         
-        # Customization summary
-        st.markdown("**Your Customization:**")
-        st.write(f"- **Material**: {material}")
-        st.write(f"- **Primary Stone**: {primary_stone}")
-        st.write(f"- **Style**: {style}")
-        st.write(f"- **Design**: {template['name']}")
+    elif jewelry_type == "necklaces":
+        chain_length = st.selectbox("Chain Length:", 
+            ["Choker (14-16\")", "Princess (18\")", "Matinee (20-24\")", "Opera (28-36\")", "Rope (37\"+)"])
+        pendant_size = st.selectbox("Pendant Size:", ["Small (<1cm)", "Medium (1-3cm)", "Large (3-5cm)", "Extra Large (5cm+)"])
     
-    with col2:
-        st.markdown("**Design Description:**")
-        st.info(f"""
-        **{template['name']}**
+    # Budget range
+    budget = st.selectbox("Target Price Range:", 
+        ["Student Budget (<$100)", "Mid-range ($100-$500)", "Luxury ($500-$2000)", "High Jewelry ($2000+)"])
+    
+    production_time = st.selectbox("Production Complexity:",
+        ["Quick (1-2 weeks)", "Standard (3-4 weeks)", "Complex (1-2 months)", "Masterpiece (3+ months)"])
+
+# Generate Design Specification
+if st.button("🎨 Generate Detailed Design Specification", type="primary", use_container_width=True):
+    
+    with st.spinner("Creating your professional design specification..."):
+        time.sleep(2)
         
-        {template['description']}
+        # Get template details
+        template = DESIGN_TEMPLATES[jewelry_type][design_style]
+        material_info = MATERIALS[material]
+        stone_info = STONES[primary_stone]
         
-        This design features:
-        - {material.lower()} construction
-        - {primary_stone.lower()} as primary stone
-        - {style.lower()} styling
-        - Professional jewelry craftsmanship
+        st.markdown("---")
+        st.markdown(f'<div class="design-spec-card">', unsafe_allow_html=True)
+        
+        # Header
+        st.markdown(f"## 🎨 {template['name']} - Design Specification")
+        st.markdown(f"**Created:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        
+        col_spec1, col_spec2 = st.columns(2)
+        
+        with col_spec1:
+            st.markdown("### 📋 Design Overview")
+            st.markdown(f'<div class="spec-item"><strong>Style:</strong> {template["name"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="spec-item"><strong>Description:</strong> {template["description"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="spec-item"><strong>Best For:</strong> {", ".join(template["best_for"])}</div>', unsafe_allow_html=True)
+            
+            st.markdown("### 🛠️ Design Elements")
+            for element in template["elements"]:
+                st.markdown(f"✅ {element}")
+        
+        with col_spec2:
+            st.markdown("### 🎨 Materials & Stones")
+            
+            # Material with color coding
+            st.markdown(f'<div class="spec-item"><strong>Primary Material:</strong> <span class="{material_info["class"]}">{material}</span></div>', unsafe_allow_html=True)
+            st.markdown(f"**Properties:** {', '.join(material_info['properties'])}")
+            
+            # Stone with color coding  
+            st.markdown(f'<div class="spec-item"><strong>Primary Stone:</strong> <span class="{stone_info["class"]}">{primary_stone}</span></div>', unsafe_allow_html=True)
+            st.markdown(f"**Properties:** {', '.join(stone_info['properties'])}")
+            
+            # Additional details
+            if engraving:
+                st.markdown(f'<div class="spec-item"><strong>Engraving:</strong> {engraving}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="spec-item"><strong>Setting:</strong> {setting_type}</div>', unsafe_allow_html=True)
+        
+        # Technical specs
+        st.markdown("### 📐 Technical Specifications")
+        col_tech1, col_tech2 = st.columns(2)
+        
+        with col_tech1:
+            st.markdown(f'<div class="spec-item"><strong>Target Audience:</strong> {target_audience}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="spec-item"><strong>Price Range:</strong> {budget}</div>', unsafe_allow_html=True)
+        
+        with col_tech2:
+            st.markdown(f'<div class="spec-item"><strong>Production Time:</strong> {production_time}</div>', unsafe_allow_html=True)
+            if jewelry_type == "rings":
+                st.markdown(f'<div class="spec-item"><strong>Ring Size:</strong> US {ring_size}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="spec-item"><strong>Band Width:</strong> {band_width}</div>', unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Student instructions
+        st.markdown("---")
+        st.subheader("🎓 Student Project Instructions")
+        
+        st.markdown(f"""
+        **Your Design Challenge:**
+        Create sketches and technical drawings based on this specification for **{template['name']}**.
+        
+        **What to Deliver:**
+        1. **Concept Sketches** (3 variations based on this spec)
+        2. **Technical Drawing** with measurements
+        3. **Material Board** showing {material} and {primary_stone}
+        4. **Design Rationale** explaining your choices
+        
+        **Design Focus Areas:**
+        - How the {', '.join(template['elements']).lower()} work together
+        - Why {material} and {primary_stone} are appropriate
+        - How this design appeals to {target_audience.lower()} audience
         """)
         
-        # Generate design card
-        if st.button("🖨️ Generate Design Card", type="primary", use_container_width=True):
-            with st.spinner("Creating your design presentation..."):
-                time.sleep(2)
-                
-                st.markdown("---")
-                st.subheader("🎉 Your Custom Jewelry Design")
-                
-                # Design card
-                st.markdown(f"""
-                <div style='border: 2px solid #f0f0f0; border-radius: 15px; padding: 25px; background: white; text-align: center;'>
-                    <h3>💎 {template['name']}</h3>
-                    <img src='{image_url}' width='250' style='border-radius: 10px; margin: 15px 0;'>
-                    <div style='text-align: left; margin: 20px;'>
-                        <p><strong>Material:</strong> {material}</p>
-                        <p><strong>Primary Stone:</strong> {primary_stone}</p>
-                        <p><strong>Style:</strong> {style}</p>
-                        <p><strong>Description:</strong> {template['description']}</p>
-                        <p><strong>Student Project Ready!</strong></p>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.success("✅ Design ready for your project! Take a screenshot or use in your presentation.")
+        # Export option
+        spec_data = {
+            "design_name": template["name"],
+            "description": template["description"],
+            "materials": material,
+            "stones": primary_stone,
+            "specifications": {
+                "style": design_style,
+                "target_audience": target_audience,
+                "budget": budget,
+                "production_time": production_time
+            }
+        }
+        
+        st.download_button(
+            "📥 Download Specification as JSON",
+            json.dumps(spec_data, indent=2),
+            file_name=f"jewelry_design_spec_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+            mime="application/json"
+        )
 
 # Educational content
 st.markdown("---")
 st.markdown("""
-### 🎓 Perfect for Student Projects:
+## 🎓 Why This Approach Works for Students:
 
-<div class="feature-box">
-<strong>✅ Real Jewelry Designs</strong><br>
-Professional templates based on actual jewelry styles
-</div>
+### ✅ **Real Design Education**
+- Learn actual jewelry design principles
+- Understand material properties and combinations
+- Practice creating technical specifications
 
-<div class="feature-box">
-<strong>✅ Customizable Options</strong><br>
-Mix and match materials, stones, and styles
-</div>
+### ✅ **Professional Skills**
+- Create design briefs like professional jewelers
+- Learn to specify materials and techniques
+- Develop critical thinking about design choices
 
-<div class="feature-box">
-<strong>✅ Design Education</strong><br>
-Learn about different jewelry styles and techniques
-</div>
+### ✅ **Portfolio Ready**
+- Generate professional design specifications
+- Build a portfolio of design concepts
+- Demonstrate understanding of jewelry design
 
-<div class="feature-box">
-<strong>✅ Presentation Ready</strong><br>
-Generate professional design cards for projects
-</div>
-
-<div class="feature-box">
-<strong>✅ No AI Dependence</strong><br>
-Reliable, consistent results every time
-</div>
+### ✅ **No Fake AI**
+- Honest approach that actually teaches design
+- Consistent, reliable results
+- Focus on learning rather than technology limitations
 """)
 
-# Project ideas
-with st.expander("💡 Student Project Ideas"):
-    st.markdown("""
-    **Design Portfolio Projects:**
-    
-    1. **Collection Design**: Create 5 matching pieces (ring, necklace, earrings, bracelet)
-    2. **Style Comparison**: Design the same piece in 3 different styles (modern, vintage, minimalist)
-    3. **Material Study**: Show how different materials change the same design
-    4. **Cultural Inspiration**: Design jewelry inspired by different cultures
-    5. **Historical Eras**: Create designs inspired by different time periods
-    
-    **Each project includes:**
-    - Design specifications
-    - Material choices
-    - Style descriptions
-    - Visual representations
-    """)
-
-# Footer
-st.markdown("---")
 st.markdown("""
-<div style='text-align: center'>
-    <p>✨ <strong>Jewelry Design Studio</strong> - Practical design tool for students</p>
-    <p>💎 Real templates • Professional results • Educational value</p>
+<div style='text-align: center; margin-top: 40px;'>
+    <p>💎 <strong>Real Jewelry Design Education</strong> - No more fake AI, just real learning!</p>
 </div>
 """, unsafe_allow_html=True)
