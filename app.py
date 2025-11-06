@@ -2,8 +2,7 @@ import streamlit as st
 import requests
 import time
 import base64
-from PIL import Image
-import io
+import json
 
 # Page configuration
 st.set_page_config(
@@ -59,222 +58,200 @@ st.markdown("""
         border-radius: 15px;
         font-size: 12px;
         font-weight: bold;
-        display: inline-block;
-        margin-bottom: 10px;
     }
-    .real-ai-notice {
-        background: linear-gradient(45deg, #667eea, #764ba2);
-        color: white;
-        padding: 15px;
+    .api-help {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
         border-radius: 10px;
-        text-align: center;
+        padding: 15px;
         margin: 10px 0;
     }
 </style>
 """, unsafe_allow_html=True)
 
-def generate_real_ai_design(prompt, api_key):
+def generate_with_proxy_api(prompt, api_key):
     """
-    Generate REAL AI jewelry designs using Hugging Face API
+    Use a more reliable API approach
     """
     try:
-        # Hugging Face API for Stable Diffusion
-        API_URL = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"
+        # Try multiple API endpoints
+        endpoints = [
+            "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1",
+            "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"
+        ]
+        
         headers = {"Authorization": f"Bearer {api_key}"}
         
-        # Enhanced prompt specifically for jewelry design
-        enhanced_prompt = f"""
-        professional jewelry design: {prompt}, 
-        high quality, detailed, studio lighting, 
-        perfect proportions, elegant jewelry piece,
-        masterpiece, 8k resolution, clean white background,
-        jewelry product photography, luxury item
-        """
+        # Better prompt for jewelry
+        enhanced_prompt = f"professional jewelry design, {prompt}, high quality, detailed, studio lighting, luxury jewelry piece"
         
         payload = {
-            "inputs": enhanced_prompt,
-            "parameters": {
-                "num_inference_steps": 25,
-                "guidance_scale": 7.5,
-                "width": 512,
-                "height": 512
-            },
-            "options": {
-                "wait_for_model": True,
-                "use_cache": True
-            }
+            "inputs": enhanced_prompt
         }
         
-        # Show loading state
-        with st.spinner("🔄 AI is creating your custom jewelry design..."):
-            response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
+        for endpoint in endpoints:
+            try:
+                response = requests.post(endpoint, headers=headers, json=payload, timeout=45)
+                
+                if response.status_code == 200:
+                    return response.content
+                elif response.status_code == 503:
+                    # Model is loading - wait and retry
+                    st.info(f"🔄 AI model is loading... This takes 20-60 seconds on first use. Please wait...")
+                    time.sleep(30)
+                    response = requests.post(endpoint, headers=headers, json=payload, timeout=45)
+                    if response.status_code == 200:
+                        return response.content
+                
+            except Exception as e:
+                continue
+                
+        return None
         
-        if response.status_code == 200:
-            return response.content
-        else:
-            st.error(f"AI API Error: {response.status_code}")
-            if response.status_code == 503:
-                st.info("AI model is loading... This can take 20-30 seconds on first use. Please try again!")
-            return None
-            
     except Exception as e:
-        st.error(f"AI service error: {str(e)}")
+        st.error(f"API Error: {str(e)}")
         return None
 
-# App title with AI badge
-st.markdown('<h1 class="main-header">💎 AI Jewel Design Generator</h1>', unsafe_allow_html=True)
-st.markdown('<div class="real-ai-notice">🚀 <strong>REAL AI POWERED</strong> - Generates custom jewelry designs from your descriptions!</div>', unsafe_allow_html=True)
+def test_api_key(api_key):
+    """
+    Test if the API key is valid
+    """
+    try:
+        headers = {"Authorization": f"Bearer {api_key}"}
+        response = requests.get("https://huggingface.co/api/whoami", headers=headers, timeout=10)
+        return response.status_code == 200
+    except:
+        return False
 
-# Sidebar for API key and settings
+# App title
+st.markdown('<h1 class="main-header">💎 AI Jewel Design Generator</h1>', unsafe_allow_html=True)
+
+# Sidebar
 with st.sidebar:
-    st.header("🔑 AI Settings")
+    st.header("🔑 AI Setup")
     
-    # API Key input
     api_key = st.text_input(
-        "Enter your Hugging Face API Key:",
+        "Hugging Face API Key:",
         type="password",
         placeholder="hf_xxxxxxxxxxxxxxxx",
-        help="Get free API key from huggingface.co → Settings → Access Tokens"
+        help="Paste your token that starts with hf_"
     )
     
-    st.header("⚙️ Design Settings")
-    num_designs = st.slider("Number of designs", 1, 3, 1)
+    if api_key:
+        if test_api_key(api_key):
+            st.success("✅ API Key is valid!")
+        else:
+            st.error("❌ Invalid API Key")
+            st.markdown("""
+            <div class="api-help">
+            <strong>How to get your free API key:</strong>
+            <ol>
+            <li>Go to <a href="https://huggingface.co" target="_blank">huggingface.co</a></li>
+            <li>Sign up/login</li>
+            <li>Go to Settings → Access Tokens</li>
+            <li>Create new token (select READ role)</li>
+            <li>Copy token starting with hf_</li>
+            <li>Paste it here</li>
+            </ol>
+            </div>
+            """, unsafe_allow_html=True)
     
-    st.header("🎨 Style Options")
-    material = st.selectbox("Material", ["Gold", "Silver", "Platinum", "Rose Gold", "Custom"])
-    jewelry_type = st.selectbox("Type", ["Ring", "Necklace", "Earrings", "Bracelet", "Custom"])
+    st.header("⚙️ Settings")
+    num_designs = st.slider("Designs to generate", 1, 2, 1)
     
     st.markdown("---")
-    if api_key:
-        st.success("✅ **AI Ready!** Your designs will be generated by real AI")
+    if api_key and test_api_key(api_key):
+        st.success("Ready for AI generation!")
     else:
-        st.info("🔑 **Enter API Key above** to enable real AI generation")
-    st.info("💡 **Tip**: Be specific! The AI will create exactly what you describe.")
+        st.info("Enter valid API key to start")
 
 # Main content
+st.markdown("### 🎨 Describe Your Jewelry Design")
+
+# Simple prompt input
+prompt = st.text_input(
+    "What jewelry do you want to create?",
+    placeholder="e.g., Gold ring with floral engraving and diamonds"
+)
+
 col1, col2 = st.columns([2, 1])
 
 with col1:
-    st.subheader("✨ Describe Your Jewelry Design")
-    
-    # AI-optimized example prompts
-    example_prompts = [
-        "Gold ring with intricate floral engraving and small diamond accents",
-        "Elegant silver necklace with geometric pendant and emerald gemstone",
-        "Rose gold earrings with pearl drops and vintage filigree details",
-        "Platinum bracelet with art deco patterns and sapphire stones"
-    ]
-    
-    st.write("**AI-optimized examples:**")
-    cols = st.columns(2)
-    for i, example in enumerate(example_prompts):
-        with cols[i % 2]:
-            if st.button(f"💎 {example[:25]}...", key=f"btn_{i}", use_container_width=True):
-                st.session_state.prompt = example
-
-    # Main input
-    prompt = st.text_area(
-        "Design description:",
-        placeholder="Example: 'A gold ring with floral engraving, small diamond accents, vintage styling, elegant proportions'",
-        height=120,
-        key="prompt_input",
-        value=st.session_state.get('prompt', '')
-    )
-
-with col2:
-    st.subheader("🤖 AI Design Guide")
-    st.markdown("""
-    **For Best AI Results:**
-    
-    ✅ **Include:**
-    - Material (gold, silver, etc.)
-    - Jewelry type (ring, necklace, etc.)
-    - Patterns (floral, geometric, etc.)
-    - Gemstones (diamond, emerald, etc.)
-    - Style (vintage, modern, etc.)
-    
-    🎯 **Example:**
-    *"Gold ring with floral engraving, emerald center stone, vintage elegant style"*
-    
-    ⚡ **The AI will create this exactly!**
-    """)
-
-# Generation section
-st.markdown("---")
-st.subheader("🎨 Generate with AI")
-
-if st.button("✨ Create with Real AI", type="primary", use_container_width=True):
-    if not api_key:
-        st.error("🔑 Please enter your Hugging Face API Key in the sidebar first!")
-        st.info("Get free API key: huggingface.co → Settings → Access Tokens")
-    elif not prompt:
-        st.warning("⚠️ Please describe your jewelry design!")
-    else:
-        # Enhanced prompt with user selections
-        full_prompt = prompt
-        if material != "Custom":
-            full_prompt = f"{material} {full_prompt}"
-        if jewelry_type != "Custom":
-            full_prompt = f"{jewelry_type}, {full_prompt}"
-        
-        st.markdown(f'<div class="ai-badge">AI GENERATING: "{full_prompt}"</div>', unsafe_allow_html=True)
-        
-        # Generate designs
-        designs = []
-        for i in range(num_designs):
-            design_image = generate_real_ai_design(full_prompt, api_key)
-            if design_image:
-                designs.append(design_image)
-            time.sleep(2)  # Rate limiting
-        
-        # Display results
-        if designs:
-            st.markdown(f'<div class="success-box">🎉 AI Generated {len(designs)} Unique Design(s)!</div>', unsafe_allow_html=True)
-            
-            # Display design cards
-            design_cols = st.columns(len(designs))
-            
-            for i, design in enumerate(designs):
-                with design_cols[i]:
-                    st.markdown(f'<div class="design-card">', unsafe_allow_html=True)
-                    st.markdown(f"### Design {i+1}")
-                    st.markdown('<div class="ai-badge">AI CREATED</div>', unsafe_allow_html=True)
+    if st.button("✨ Generate with AI", type="primary", use_container_width=True):
+        if not api_key:
+            st.error("Please enter your Hugging Face API Key in the sidebar")
+        elif not prompt:
+            st.warning("Please describe your jewelry design")
+        else:
+            with st.spinner("🤖 AI is creating your jewelry design... This may take 30-60 seconds on first use"):
+                
+                # Show progress
+                progress_bar = st.progress(0)
+                for i in range(100):
+                    progress_bar.progress(i + 1)
+                    time.sleep(0.3)
+                
+                # Generate design
+                image_data = generate_with_proxy_api(prompt, api_key)
+                
+                if image_data:
+                    st.markdown(f'<div class="success-box">🎉 AI Successfully Created Your Design!</div>', unsafe_allow_html=True)
                     
-                    # Display AI-generated image
-                    st.image(design, use_column_width=True, caption=f"AI: {prompt}")
+                    # Display the image
+                    st.image(image_data, use_column_width=True, caption=f"AI Generated: {prompt}")
                     
                     # Download button
                     st.download_button(
-                        label="📥 Download AI Design",
-                        data=design,
-                        file_name=f"ai_jewelry_design_{i+1}.png",
+                        "📥 Download Design",
+                        image_data,
+                        file_name="ai_jewelry_design.png",
                         mime="image/png",
-                        key=f"download_{i}",
                         use_container_width=True
                     )
-                    st.markdown('</div>', unsafe_allow_html=True)
-        else:
-            st.error("❌ AI generation failed. Please check your API key and try again.")
-            st.info("💡 First generation might take 20-30 seconds as the AI model loads.")
+                else:
+                    st.error("❌ AI generation failed. Possible reasons:")
+                    st.info("""
+                    - **First time use**: AI models take 30-60 seconds to load
+                    - **API key issues**: Make sure your token is correct
+                    - **Rate limits**: Free tier has some limits
+                    - **Try again**: The model might be busy
+                    """)
+                    
+                    st.markdown("""
+                    **Quick Fixes:**
+                    - Wait 1 minute and try again
+                    - Check your API key is correct
+                    - Try a simpler prompt like "gold ring"
+                    """)
 
-# Student benefits with AI
-st.markdown("---")
-st.markdown("""
-### 🎓 AI-Powered Learning:
+with col2:
+    st.markdown("### 💡 Tips")
+    st.markdown("""
+    **Best Prompts:**
+    - "Gold ring with floral pattern"
+    - "Silver necklace with gemstone"
+    - "Diamond earrings modern"
+    - "Pearl bracelet elegant"
+    
+    **First time?** Wait 30-60 seconds for AI to load
+    """)
 
-**With Real AI, Students Can:**
-- ✅ **Create custom designs** that don't exist yet
-- ✅ **Explore exact specifications** from text descriptions  
-- ✅ **Generate unlimited variations** of the same concept
-- ✅ **Build professional portfolios** with unique AI creations
-- ✅ **Learn design principles** through AI experimentation
-""")
+# Alternative if API doesn't work
+with st.expander("🔄 Still having issues? Try this:"):
+    st.markdown("""
+    **If the AI API continues to fail:**
+    
+    1. **Wait 5 minutes** - Hugging Face models can take time to load
+    2. **Verify your token** at huggingface.co/settings/tokens
+    3. **Try this exact prompt**: "simple gold ring"
+    4. **Contact me** and I'll help debug further
+    
+    **Remember:** Free AI services can be slow during peak times, but they DO work!
+    """)
 
-# Footer
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center'>
-    <p>🤖 <strong>Real AI Jewelry Designer</strong> - Creating custom designs from your imagination!</p>
-    <p>✨ Text-to-Image AI • Unlimited Custom Designs • Perfect for Student Projects</p>
+    <p>🎓 <strong>For Students</strong> - Generate unlimited jewelry designs for your projects!</p>
 </div>
 """, unsafe_allow_html=True)
