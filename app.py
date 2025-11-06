@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 import time
-import random
 import base64
 from PIL import Image
 import io
@@ -53,94 +52,104 @@ st.markdown("""
         text-align: center;
         margin: 20px 0;
     }
-    .jewelry-preview {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .ai-badge {
+        background: linear-gradient(45deg, #FF6B6B, #FF8E53);
         color: white;
-        padding: 30px;
+        padding: 5px 10px;
         border-radius: 15px;
+        font-size: 12px;
+        font-weight: bold;
+        display: inline-block;
+        margin-bottom: 10px;
+    }
+    .real-ai-notice {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
         text-align: center;
-        margin: 20px 0;
+        margin: 10px 0;
     }
 </style>
 """, unsafe_allow_html=True)
 
-def get_relevant_jewelry_image(prompt, design_number):
+def generate_real_ai_design(prompt, api_key):
     """
-    Get ACTUAL jewelry images based on the prompt
+    Generate REAL AI jewelry designs using Hugging Face API
     """
-    # Map prompts to relevant jewelry image searches
-    prompt_lower = prompt.lower()
-    
-    # Define jewelry-specific image searches
-    jewelry_searches = {
-        'ring': ['ring', 'jewelry ring', 'engagement ring', 'wedding ring', 'gold ring', 'silver ring'],
-        'necklace': ['necklace', 'jewelry necklace', 'gold necklace', 'pendant necklace'],
-        'earring': ['earrings', 'jewelry earrings', 'gold earrings', 'diamond earrings'],
-        'bracelet': ['bracelet', 'jewelry bracelet', 'gold bracelet', 'silver bracelet'],
-        'gold': ['gold jewelry', 'gold ring', 'gold necklace'],
-        'silver': ['silver jewelry', 'silver ring', 'silver necklace'],
-        'floral': ['floral jewelry', 'flower ring', 'floral engraving'],
-        'diamond': ['diamond ring', 'diamond jewelry', 'diamond necklace'],
-        'pearl': ['pearl jewelry', 'pearl earrings', 'pearl necklace'],
-        'engraving': ['engraved jewelry', 'detailed jewelry', 'pattern ring']
-    }
-    
-    # Find relevant search terms based on prompt
-    search_terms = ['jewelry', 'luxury jewelry']  # Default
-    
-    for keyword, terms in jewelry_searches.items():
-        if keyword in prompt_lower:
-            search_terms.extend(terms)
-    
-    # Remove duplicates and ensure we have jewelry-related terms
-    search_terms = list(set(search_terms))
-    
-    # Try multiple image services
-    services = [
-        f"https://source.unsplash.com/400x400/?{','.join(search_terms[:2])}",
-        f"https://source.unsplash.com/featured/400x400/?{search_terms[0]},jewelry",
-        f"https://picsum.photos/400/400?random={design_number + 100}"  # Different seed
-    ]
-    
-    for service_url in services:
-        try:
-            response = requests.get(service_url, timeout=10)
-            if response.status_code == 200:
-                return response.content
-        except:
-            continue
-    
-    return None
+    try:
+        # Hugging Face API for Stable Diffusion
+        API_URL = "https://api-inference.huggingface.co/models/runwayml/stable-diffusion-v1-5"
+        headers = {"Authorization": f"Bearer {api_key}"}
+        
+        # Enhanced prompt specifically for jewelry design
+        enhanced_prompt = f"""
+        professional jewelry design: {prompt}, 
+        high quality, detailed, studio lighting, 
+        perfect proportions, elegant jewelry piece,
+        masterpiece, 8k resolution, clean white background,
+        jewelry product photography, luxury item
+        """
+        
+        payload = {
+            "inputs": enhanced_prompt,
+            "parameters": {
+                "num_inference_steps": 25,
+                "guidance_scale": 7.5,
+                "width": 512,
+                "height": 512
+            },
+            "options": {
+                "wait_for_model": True,
+                "use_cache": True
+            }
+        }
+        
+        # Show loading state
+        with st.spinner("🔄 AI is creating your custom jewelry design..."):
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=120)
+        
+        if response.status_code == 200:
+            return response.content
+        else:
+            st.error(f"AI API Error: {response.status_code}")
+            if response.status_code == 503:
+                st.info("AI model is loading... This can take 20-30 seconds on first use. Please try again!")
+            return None
+            
+    except Exception as e:
+        st.error(f"AI service error: {str(e)}")
+        return None
 
-# App title
+# App title with AI badge
 st.markdown('<h1 class="main-header">💎 AI Jewel Design Generator</h1>', unsafe_allow_html=True)
-st.markdown("### Create unlimited jewelry designs with AI - No downloads required!")
+st.markdown('<div class="real-ai-notice">🚀 <strong>REAL AI POWERED</strong> - Generates custom jewelry designs from your descriptions!</div>', unsafe_allow_html=True)
 
-# Preview section showing what students will get
-st.markdown("""
-<div class="jewelry-preview">
-    <h3>🎨 Generate Beautiful Jewelry Designs</h3>
-    <p>Describe your dream jewelry and get relevant design inspirations!</p>
-    <p><strong>Perfect for student projects and design exploration</strong></p>
-</div>
-""", unsafe_allow_html=True)
-
-# Sidebar
+# Sidebar for API key and settings
 with st.sidebar:
+    st.header("🔑 AI Settings")
+    
+    # API Key input
+    api_key = st.text_input(
+        "Enter your Hugging Face API Key:",
+        type="password",
+        placeholder="hf_xxxxxxxxxxxxxxxx",
+        help="Get free API key from huggingface.co → Settings → Access Tokens"
+    )
+    
     st.header("⚙️ Design Settings")
-    num_designs = st.slider("Number of designs", 1, 4, 2)
+    num_designs = st.slider("Number of designs", 1, 3, 1)
     
     st.header("🎨 Style Options")
-    material = st.selectbox("Material", ["Gold", "Silver", "Platinum", "Rose Gold", "Any"])
-    jewelry_type = st.selectbox("Type", ["Ring", "Necklace", "Earrings", "Bracelet", "Any"])
+    material = st.selectbox("Material", ["Gold", "Silver", "Platinum", "Rose Gold", "Custom"])
+    jewelry_type = st.selectbox("Type", ["Ring", "Necklace", "Earrings", "Bracelet", "Custom"])
     
     st.markdown("---")
-    st.info("""
-    💡 **Better Results:**
-    - Be specific: "gold ring with floral engraving"
-    - Mention gemstones: "with diamond accents"
-    - Add style: "vintage style", "modern design"
-    """)
+    if api_key:
+        st.success("✅ **AI Ready!** Your designs will be generated by real AI")
+    else:
+        st.info("🔑 **Enter API Key above** to enable real AI generation")
+    st.info("💡 **Tip**: Be specific! The AI will create exactly what you describe.")
 
 # Main content
 col1, col2 = st.columns([2, 1])
@@ -148,139 +157,124 @@ col1, col2 = st.columns([2, 1])
 with col1:
     st.subheader("✨ Describe Your Jewelry Design")
     
-    # Better example prompts that work well
+    # AI-optimized example prompts
     example_prompts = [
-        "Gold ring with floral engraving and diamond",
-        "Silver necklace with geometric pendant",
-        "Pearl earrings with gold setting",
-        "Engagement ring with vintage details"
+        "Gold ring with intricate floral engraving and small diamond accents",
+        "Elegant silver necklace with geometric pendant and emerald gemstone",
+        "Rose gold earrings with pearl drops and vintage filigree details",
+        "Platinum bracelet with art deco patterns and sapphire stones"
     ]
     
-    st.write("**Click these examples for best results:**")
+    st.write("**AI-optimized examples:**")
     cols = st.columns(2)
     for i, example in enumerate(example_prompts):
         with cols[i % 2]:
-            if st.button(f"💎 {example}", key=f"btn_{i}", use_container_width=True):
+            if st.button(f"💎 {example[:25]}...", key=f"btn_{i}", use_container_width=True):
                 st.session_state.prompt = example
 
     # Main input
     prompt = st.text_area(
         "Design description:",
-        placeholder="Example: 'Gold ring with floral engraving, diamond accents, and vintage styling'",
-        height=100,
+        placeholder="Example: 'A gold ring with floral engraving, small diamond accents, vintage styling, elegant proportions'",
+        height=120,
         key="prompt_input",
         value=st.session_state.get('prompt', '')
     )
 
 with col2:
-    st.subheader("📝 Pro Tips")
+    st.subheader("🤖 AI Design Guide")
     st.markdown("""
-    **For Relevant Images:**
+    **For Best AI Results:**
     
-    ✅ **Do:**
-    - "Gold ring with floral pattern"
-    - "Silver necklace geometric"
-    - "Pearl earrings gold"
-    - "Diamond ring vintage"
+    ✅ **Include:**
+    - Material (gold, silver, etc.)
+    - Jewelry type (ring, necklace, etc.)
+    - Patterns (floral, geometric, etc.)
+    - Gemstones (diamond, emerald, etc.)
+    - Style (vintage, modern, etc.)
     
-    ❌ **Avoid:**
-    - Too generic descriptions
-    - Uncommon materials
-    - Complex combinations
+    🎯 **Example:**
+    *"Gold ring with floral engraving, emerald center stone, vintage elegant style"*
     
-    **The AI finds real jewelry images based on your keywords!**
+    ⚡ **The AI will create this exactly!**
     """)
 
 # Generation section
 st.markdown("---")
-st.subheader("🎨 Generate Design Inspirations")
+st.subheader("🎨 Generate with AI")
 
-if st.button("✨ Get Jewelry Design Ideas", type="primary", use_container_width=True):
-    if not prompt:
-        st.warning("⚠️ Please describe your jewelry design first!")
+if st.button("✨ Create with Real AI", type="primary", use_container_width=True):
+    if not api_key:
+        st.error("🔑 Please enter your Hugging Face API Key in the sidebar first!")
+        st.info("Get free API key: huggingface.co → Settings → Access Tokens")
+    elif not prompt:
+        st.warning("⚠️ Please describe your jewelry design!")
     else:
-        with st.spinner("🔍 Finding beautiful jewelry designs matching your description..."):
-            progress_bar = st.progress(0)
-            
-            # Show progress
-            for i in range(100):
-                progress_bar.progress(i + 1)
-                time.sleep(0.03)
-            
-            # Display results
-            st.markdown(f'<div class="success-box">🎉 Found {num_designs} jewelry designs matching "{prompt}"!</div>', unsafe_allow_html=True)
+        # Enhanced prompt with user selections
+        full_prompt = prompt
+        if material != "Custom":
+            full_prompt = f"{material} {full_prompt}"
+        if jewelry_type != "Custom":
+            full_prompt = f"{jewelry_type}, {full_prompt}"
+        
+        st.markdown(f'<div class="ai-badge">AI GENERATING: "{full_prompt}"</div>', unsafe_allow_html=True)
+        
+        # Generate designs
+        designs = []
+        for i in range(num_designs):
+            design_image = generate_real_ai_design(full_prompt, api_key)
+            if design_image:
+                designs.append(design_image)
+            time.sleep(2)  # Rate limiting
+        
+        # Display results
+        if designs:
+            st.markdown(f'<div class="success-box">🎉 AI Generated {len(designs)} Unique Design(s)!</div>', unsafe_allow_html=True)
             
             # Display design cards
-            design_cols = st.columns(num_designs)
+            design_cols = st.columns(len(designs))
             
-            for i in range(num_designs):
+            for i, design in enumerate(designs):
                 with design_cols[i]:
                     st.markdown(f'<div class="design-card">', unsafe_allow_html=True)
                     st.markdown(f"### Design {i+1}")
+                    st.markdown('<div class="ai-badge">AI CREATED</div>', unsafe_allow_html=True)
                     
-                    # Get RELEVANT jewelry image
-                    image_data = get_relevant_jewelry_image(prompt, i)
+                    # Display AI-generated image
+                    st.image(design, use_column_width=True, caption=f"AI: {prompt}")
                     
-                    if image_data:
-                        # Display image
-                        st.image(image_data, use_column_width=True, caption=f"💎 {prompt}")
-                        
-                        # Download button
-                        st.download_button(
-                            label="📥 Save Design",
-                            data=image_data,
-                            file_name=f"jewelry_design_{i+1}.png",
-                            mime="image/png",
-                            key=f"download_{i}",
-                            use_container_width=True
-                        )
-                    else:
-                        # Fallback to jewelry-specific placeholder
-                        st.image(f"https://source.unsplash.com/featured/400x400/?jewelry,{['ring','necklace','earrings','bracelet'][i % 4]}", 
-                                use_container_width=True, 
-                                caption="Jewelry Design Inspiration")
-                        st.info("💡 Design inspiration for your project!")
-                    
+                    # Download button
+                    st.download_button(
+                        label="📥 Download AI Design",
+                        data=design,
+                        file_name=f"ai_jewelry_design_{i+1}.png",
+                        mime="image/png",
+                        key=f"download_{i}",
+                        use_container_width=True
+                    )
                     st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.error("❌ AI generation failed. Please check your API key and try again.")
+            st.info("💡 First generation might take 20-30 seconds as the AI model loads.")
 
-# Educational value section
+# Student benefits with AI
 st.markdown("---")
 st.markdown("""
-### 🎓 Perfect for Student Projects:
+### 🎓 AI-Powered Learning:
 
-**How to use this for assignments:**
-1. **Generate multiple designs** for the same concept
-2. **Compare different styles** (vintage vs modern)
-3. **Create design portfolios** with varied pieces
-4. **Download and present** in your projects
-5. **Explore material combinations** (gold vs silver)
-
-**Educational Benefits:**
-- ✅ **Design Exploration** - Try unlimited variations
-- ✅ **Style Comparison** - See different aesthetic approaches  
-- ✅ **Material Studies** - Understand how materials affect design
-- ✅ **Presentation Ready** - Professional-looking outputs
-- ✅ **No Cost** - Completely free for students
+**With Real AI, Students Can:**
+- ✅ **Create custom designs** that don't exist yet
+- ✅ **Explore exact specifications** from text descriptions  
+- ✅ **Generate unlimited variations** of the same concept
+- ✅ **Build professional portfolios** with unique AI creations
+- ✅ **Learn design principles** through AI experimentation
 """)
-
-# Real AI upgrade info (collapsed)
-with st.expander("🚀 Upgrade to Real Text-to-Image AI (Coming Soon)"):
-    st.markdown("""
-    **Next Level Features Coming:**
-    
-    - **Real AI Generation**: Create completely new designs from text
-    - **Custom Jewelry**: Unique designs that don't exist yet
-    - **Exact Specifications**: Match your description perfectly
-    - **Style Transfer**: Apply different art styles
-    
-    *Current version provides real jewelry inspirations and design references!*
-    """)
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center'>
-    <p>💎 <strong>Jewelry Design Inspiration Generator</strong> - Helping students explore design possibilities!</p>
-    <p>✨ Real jewelry images • Design references • Unlimited exploration</p>
+    <p>🤖 <strong>Real AI Jewelry Designer</strong> - Creating custom designs from your imagination!</p>
+    <p>✨ Text-to-Image AI • Unlimited Custom Designs • Perfect for Student Projects</p>
 </div>
 """, unsafe_allow_html=True)
